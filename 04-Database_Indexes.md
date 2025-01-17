@@ -1,3 +1,36 @@
+# Index
+1. [Relational Schema](#relational-schema)
+   - [Composition](#composition)
+   - [Integrity Rules](#integrity-rules)
+   - [Compact Notation](#compact-notation)
+   - [Additional Domains](#additional-domains)
+   - [Generalizations](#generalizations)
+
+2. [Indexes in PostgreSQL](#indexes-in-postgresql)
+   - [Overview](#overview)
+   - [B-Tree Indexes](#b-tree-indexes)
+   - [Hash Indexes](#hash-indexes)
+   - [Example](#example)
+   - [Comparison Table](#comparison-table)
+
+3. [Advanced Index Types](#advanced-index-types)
+   - [Multicolumn Indexes](#multicolumn-indexes)
+   - [Expression Indexes](#expression-indexes)
+   - [Unique Indexes](#unique-indexes)
+   - [Clustering](#clustering)
+   - [Cardinality](#cardinality)
+
+4. [Full-Text Search (FTS)](#full-text-search-fts)
+   - [Overview](#fts-overview)
+   - [Key Components](#key-components)
+     - [`tsvector` Type](#tsvector-type)
+     - [`tsquery` Type](#tsquery-type)
+     - [Matching](#matching)
+   - [Weighting in FTS](#weighting-in-fts)
+   - [Ranking FTS Results](#ranking-fts-results)
+   - [Pre-Calculated FTS](#pre-calculated-fts)
+
+
 # Relational Schema 
 
 ## Composition
@@ -15,13 +48,14 @@
 Se não estiver na Boyce–Codd Normal Form (BCNF), o esquema é refinado utilizando a normalização.
 
 ## Compact Notation
-table1(<u>id</u>, attribute NN)
 
-table2(<u>id</u>, attribute → Table1 NN)
+table1(<ins>id</ins>, attribute NN)
 
-table3(<u>id1, id2 → Table2</u>, attribute UK NN)
+table2(<ins>id</ins>, attribute → Table1 NN)
 
-table4(<u>(id1, id2) → Table3</u>, id3, attribute)
+table3(<ins>id1, id2 → Table2</ins>, attribute UK NN)
+
+table4(<ins>(id1, id2) → Table3</ins>, id3, attribute)
 
 
 NN -> NOTNULL, UK -> UNIQUE
@@ -36,15 +70,15 @@ Priority ENUM ('High', 'Medium', 'Low')
 
 ## Generalizations
 
-![alt text](image.png)
+![alt text](images/04-Database_indexes/image.png)
 
-media(<u>id</u>, ...)
+media(<ins>id</ins>, ...)
 
-book(<u>id->media</u>, ...)
+book(<ins>id->media</ins>, ...)
 
-cd(<u>id->media</u>, ...)
+cd(<ins>id->media</ins>, ...)
 
-dvd(<u>id->media</u>, ...)
+dvd(<ins>id->media</ins>, ...)
 
 
 # Indexes in PostgreSQL
@@ -57,11 +91,11 @@ dvd(<u>id->media</u>, ...)
 
 ## B-Tree Indexes 
 
-![alt text](image-1.png)
+![alt text](images/04-Database_indexes/image-1.png)
 
 ## Hash Indexes
 
-![alt text](image-2.png)
+![alt text](images/04-Database_indexes/image-2.png)
 
 ## Example
 ```sql
@@ -134,4 +168,114 @@ of rows returned by a `WHERE` clause. This is then used to decide if, and what, 
 
 - `Low cardinality - boolean column` (Apenas pode assumir `2 valores`, `True` ou `False`, pelo que a probabilidade de aparecer um valor boleano repetido numa coluna é bastante alta - Se houver no mínimo `3 linhas` de certeza aparece repetido um valor)
 
-## Full Text Search (FTS)
+
+## Full-Text Search (FTS)
+- **Definition**: Provides efficient searching for textual data, supporting features like ranking, stemming, and proximity.
+
+### Limitations of `LIKE`:
+- Lacks linguistic support (e.g., handling singular/plural forms).
+- Does not rank results or support complex queries.
+
+### Steps:
+1. **Define a Document**: Identify the columns and data that constitute searchable content.
+2. **Index Words Individually**: Using PostgreSQL's FTS tools.
+
+---
+
+### Key Components of FTS
+
+#### `tsvector` Type
+- **Definition**: Stores lexemes (normalized words).
+- **Features**:
+  - Removes duplicates and stop words (e.g., "the", "and").
+  - Records word positions.
+- **Example**:
+  ```sql
+  SELECT to_tsvector('english', 'The quick brown fox jumps over the lazy dog');
+  -- Result: 'brown':3 'dog':9 'fox':4 'jump':5 'lazi':8 'quick':2
+
+#### `tsquery` Type
+- **Definition**: Represents search queries optimized for matching `tsvector`.
+- **Features**:
+  - Created using functions like `plainto_tsquery` and `to_tsquery`.
+- **Example**:
+  ```sql
+    SELECT plainto_tsquery('english', 'sail boats');
+    -- Result: 'sail' & 'boat'
+
+#### Matching
+- **Definition**: Use the `@@` operator to match `tsvector` against `tsquery`.
+
+- **Examples**:
+   
+    1. `Selecting`:
+        ```sql
+            SELECT * FROM posts WHERE to_tsvector('english', title) @@ plainto_tsquery('english', 'jumping dog');
+        ```
+    2. `Check`:
+        ```sql
+        ➔ SELECT to_tsvector('portuguese','o velho barco') @@
+        plainto_tsquery('portuguese','barca');
+        ➔ t
+        ➔ SELECT to_tsvector('portuguese','o velho barco') @@
+        plainto_tsquery('portuguese','carro');
+        ➔ f
+        ```
+
+    
+
+
+### Weighting in FTS
+
+- Assigns importance to different parts of a document.
+
+- **Weights**:
+    - `A`: **Highest importance**.
+    - `D`: **Lowest importance**.
+
+- **Example:**
+    1. `Format Example`:
+        ```sql
+        SELECT setweight(to_tsvector('english', 'Important text'), 'A') ||
+            setweight(to_tsvector('english', 'Less important text'), 'D');
+    2. `Example`:
+        ```sql
+        ➔ SELECT
+        setweight(to_tsvector('english', 'The quick brown fox jumps over the lazy dog'), 'A') ||
+        setweight(to_tsvector('english', 'An English language pangram. A sentence that contains
+        all of the letters of the alphabet.'), 'B')
+        ➔ 'alphabet':24B 'brown':3A 'contain':17B 'dog':9A 'english':11B 'fox':4A 'jump':5A
+        'languag':12B 'lazi':8A 'letter':21B 'pangram':13B' quick':2A 'sentenc':15B
+        ```
+
+### Ranking FTS Results
+
+- Orders search results by relevance.
+
+- **Functions**:
+    - `ts_rank`: Computes a ranking score based on `term frequency`, `proximity`, and `structural importance`.
+
+- **Example:**
+    1. `Format Example`:
+        ```sql
+        SELECT ts_rank(setweight(to_tsvector('english', 'content'), 'A'), plainto_tsquery('english', 'search terms'));
+        ```
+    2. `Example`:
+        ```sql
+        ➔ SELECT ts_rank(
+        setweight(to_tsvector('english', 'The quick brown fox jumps over the lazy dog'), 'A') ||
+        setweight(to_tsvector('english', 'An English language pangram. A sentence that contains all of the
+        letters of the alphabet.'), 'B'),
+        plainto_tsquery('english', 'jumping dog')
+        )
+        ➔ 0.9524299 
+        ```
+
+### Pre-calculated FTS
+- **Optimization**:
+    - Pre-calculate and store tsvector values in a table column.
+    - Update this column using triggers when rows are inserted or updated.
+
+- **Trigger to update the table**:
+
+    ![alt text](images/04-Database_indexes/image3.png)

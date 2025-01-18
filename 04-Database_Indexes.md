@@ -29,7 +29,8 @@
    - [Weighting in FTS](#weighting-in-fts)
    - [Ranking FTS Results](#ranking-fts-results)
    - [Pre-Calculated FTS](#pre-calculated-fts)
-
+   - [Indexing FTS](#indexing-fts)
+     - 
 
 # Relational Schema 
 
@@ -279,3 +280,27 @@ of rows returned by a `WHERE` clause. This is then used to decide if, and what, 
 - **Trigger to update the table**:
 
     ![alt text](images/04-Database_indexes/image3.png)
+
+### Indexing FTS
+- Search is a pre-calculated column containing the tsvector of the columns we want to search.
+- Pre-calculating tsvector values and storing them in a column ensures better performance.
+- Use the `@@` operator to match a `tsquery` against the `tsvector`.
+- Use `ts_rank` to rank the results by relevance and order them.
+
+**Example Query**   
+- To select all posts containing both `jumping` and `dog`, use the following query:
+
+```sql
+SELECT title 
+FROM posts
+WHERE search @@ plainto_tsquery('english', 'jumping dog')
+ORDER BY ts_rank(search, plainto_tsquery('english', 'jumping dog')) DESC;
+```
+
+**Creating Indexes**
+1. `GIN` Index (Static Data)
+    - `Faster` lookups for `larger datasets`
+
+2. `GiST` Index (Dynamic Data - Frequent updates)
+    - More `efficient` for `insertions` and `updates`
+

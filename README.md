@@ -20,3 +20,18 @@
     
     4. [Transactions](04-Database_Triggers_Transactions.md/#transactions)
     
+# [lbaw2425-05-web-applications](slides/util/lbaw2425-05-web-applications.pdf)
+# Index
+
+1. The Internet
+
+2. Domain Names and Addressing
+
+3. The World Wide Web
+
+4. Web Applications
+
+5. Rendering on the Web
+   
+6. Web Technologies
+   
